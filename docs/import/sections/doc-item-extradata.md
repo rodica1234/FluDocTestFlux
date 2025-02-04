@@ -1,0 +1,1 @@
+Viene riportata la lista degli **Extra data** collegati all'articolo, con la possibilità di aggiungere nuovi extra data utili solo per il documento in oggetto. Il flag *Da stampare* permette di scegliere quali extra data stampare.

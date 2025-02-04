@@ -1,0 +1,1 @@
+**Storno ricevimenti**: permette di stornare i tipi di documenti che hanno la natura di tipo reso.

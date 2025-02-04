@@ -1,0 +1,8 @@
+**Tip linie** ofera posibilitatea de a selecta tipuri diferite de articole:
+
+>**Articol codificat**: se refera la articole codificate in registrul de articole al societatii, deci articole care influenteaza atat contabilitatea, cat si gestiunea;
+>**Articol necodificat**: se refera la articole care nu sunt codificate in registrul de articole al societatii, influenteaza contabilitatea, dar nu si gestiunea;
+>**Articol cheltuieli**: se refera la articole care sunt sau nu codificate, sunt gestionate separat in rezumatul documentelor si nu au miscari in gestiune;
+>**Articol note**: este o simpla nota, nu influenteaza contabilitatea si nici gestiunea.
+
+Se poate renunta la inserarea pas cu pas a acestor date, pentru ca, in momentul in care inserati direct o clasa sau o matricola, tipul liniei 'codificat' este selectat automat. In momentul in care il inserati, programul preia automat articolul asociat, cu toate datele din registrul sau. Inserarea clasei sau matricolei se poate realiza manual sau utilizand "Help-ul Articole" (dublu clic pe banda galbena) care va va propune toate datele relative, inserate in Registrul Articole. Dupa ce ati inserat articolul, descrierea lui va fi preluata automat din registru. Daca articolul are variante, trebuie sa selectati varianta corespunzatoare din combobox Variante. Lotul, pentru articolele gestionate cu loturi, se genereaza automat sau poate fi inserat manual.

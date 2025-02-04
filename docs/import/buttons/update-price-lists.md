@@ -1,0 +1,2 @@
+- **Aggiornamento listini**: permette di aggiornare il prezzo del listino in base al nuovo prezzo inserito per l'articolo.<br />
+Cliccando sulla tendina accanto al pulsante ![](/img/neutral/common/down-arrow.png), invece, sarà possibile creare un nuovo listino se ancora da creare.

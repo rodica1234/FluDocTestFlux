@@ -1,0 +1,1 @@
+- **Fornitore**, usando l'[help di campoguide/common/operations-with-data/manual-entry-or-help-and-data-selection) oppure tastando [manualmente guide/common/operations-with-data/manual-entry-or-help-and-data-selection) i dati.

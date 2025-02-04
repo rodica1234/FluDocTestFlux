@@ -1,0 +1,1 @@
+Viene visualizzato il dettaglio di un eventuale **Documento allegato** (nome, tipo di documento, eventuali note, ns/vs riferimento). Per le istruzioni relative a come allegare un documento si rimanda all'articolo [Allega documentiguide/common/operations-with-data/attach-documents).

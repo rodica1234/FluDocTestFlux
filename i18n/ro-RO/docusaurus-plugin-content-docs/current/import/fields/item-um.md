@@ -1,0 +1,1 @@
+**Unità di misura**: viene proposta U.M. principale dell'articolo, ma l'utente ha la possibilità di scegliere un'altra unità di misura.

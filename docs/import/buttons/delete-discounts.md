@@ -1,0 +1,1 @@
+- **Cancella sconti**: permette di cancellare lo sconto selezionato dalla griglia corrispondente.

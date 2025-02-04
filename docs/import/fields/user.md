@@ -1,0 +1,1 @@
+- **Operatore**: permette di inserire l'utente che crea il documento. I dipendenti sono stati inseriti in precedenza nella tabella *Dipendenti* che si trova nel percorso *Home > Dipendenti*. Il dato diventa **obbligatorio** se l'opzione è impostata nei Parametri del documento stesso.

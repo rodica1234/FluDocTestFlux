@@ -1,0 +1,1 @@
+- **IVA**: è *prioritario* il dato inserito nel campo IVA dell'*Anagrafica contatto*. Se questo non è presente, viene proposto il valore presente nell'*Anagrafica articolo*, ma l'utente ha la possibilità di inserire un'altro dato. È un campo obbligatorio.

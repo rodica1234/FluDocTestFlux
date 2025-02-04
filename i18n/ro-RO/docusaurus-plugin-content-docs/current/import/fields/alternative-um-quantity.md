@@ -1,0 +1,3 @@
+**UM alternativa**: in questi campi verrà visualizzata la quantità nell'unità di misura alternativa nel caso in cui nell'*anagrafica articolo* questo dato sia presente nel tab **UM alternativa** (viene preso quello che ha il flag di **Default** impostato) e se nei parametri del documento sono stati attivati i flag: **Gestisci doppia unità di misura** e **Proposta automatica UM alternativa**.
+
+**Quantità alternativa**: viene proposto il valore relativo all' U.M. alternativa, calcolato moltiplicando o dividendo la *quantità gestionale* (relativa all' U.M. principale) con il *fattore di conversione* impostato nell'*Anagrafica articolo > tab UM alternativa*.

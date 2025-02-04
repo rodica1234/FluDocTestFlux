@@ -1,0 +1,1 @@
+- **Aggiorna ubicazione**: utilizzata per aggiornare l'ubicazione in base alla causale e la riporta nella riga. Il pulsante diventa attivo se si scelgono almeno due articoli e apre l'help delle ubicazioni  da dove si può scegliere la nuova ubicazione per tutti gli articoli selezionati per questa procedura.

@@ -1,0 +1,3 @@
+**Classe/Codice/Descrizione articolo**: si possono inserire  [manualmente guide/common/operations-with-data/manual-entry-or-help-and-data-selection) oppure con l'ausilio del  [help di campoguide/common/operations-with-data/manual-entry-or-help-and-data-selection) il quale proporrà tutti i dati relativi inseriti nell'*Anagrafica articolo*.
+
+Dopo l'inserimento dell'articolo, la sua *Descrizione* sarà ripresa automaticamente dall'anagrafica. Se l'articolo ha *Varianti*, sarà necessario selezionare la variante desiderata dal combobox *Varianti*.

@@ -1,0 +1,1 @@
+**Quantità**: rappresenta la quantità dell'U.M. principale e di default ha il valore 1; può essere inserita manualmente oppure può essere ripresa dal documento considerato per l'evasione (per esempio dall'ordine fornitore).

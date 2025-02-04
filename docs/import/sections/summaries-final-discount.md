@@ -1,0 +1,6 @@
+Gli sconti finali applicati a livello di singolo articolo vengono distribuiti (o "spalmati") su ciascuna riga articolo del documento. Questo significa che l'importo dello sconto è suddiviso proporzionalmente tra tutti gli articoli presenti nel documento, e lo sconto relativo sarà visibile nel tab Articoli per ogni singola riga.
+
+- **Tipo/Descrizione sconto**: permette di scegliere le tipologie di sconto (predefiniti in [Tipi sconticonfigurations/tables/general-settings/discount-types)), attribuendo alla tipologia la priorità di applicazione dello sconto e se lo sconto viene calcolato sull'imponibile o in cascata rispetto agli sconti precedentemente applicati.  
+- **Priorità**: rappresenta la priorità di applicazione dello sconto; l'ordinamento da applicare avviene in modo crescente.  
+- **Cascata/Imponibile**: per definire se il calcolo dello sconto usa come imponibile il (prezzo * quantità) - (sconti già calcolati) oppure (prezzo * quantità).  
+- **Valore**: valore numerico dello sconto finale da applicare.  
