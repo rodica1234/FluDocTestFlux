@@ -10,7 +10,7 @@ const config = {
   title: 'Fluentis ERP Documentation',
   tagline: 'La guida progettata per supportarti nell’utilizzo quotidiano di Fluentis ERP',
   url: 'https://docs.fluentis.com',
-  baseUrl: '/FluentisErp/',
+  baseUrl: '/FluDocTestFlux/',
   onBrokenLinks: 'throw',
   onBrokenMarkdownLinks: 'ignore',
   favicon: 'img/fluentis-32x32px.png',
