@@ -1,0 +1,274 @@
+name: Localize New Pages
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'docs/**'
+  workflow_dispatch:
+
+jobs:
+  check-doc-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      docs_changed: ${{ steps.check_docs_changes.outputs.docs_changed }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ssh-key: ${{ secrets.DEPLOY_KEY }}
+
+      # Check for changes in the /docs folder
+      - name: Check for changes in the /docs folder
+        id: check_docs_changes
+        run: |
+          # Check for changes in the /docs folder in the last commit
+          git diff --name-only HEAD~1 HEAD -- docs/ > changes.txt
+          
+          if [ ! -s changes.txt ]; then
+            echo "No changes detected in the /docs folder."
+            echo "docs_changed=false" >> $GITHUB_OUTPUT
+          else
+            echo "Changes detected in the /docs folder:"
+            cat changes.txt
+            echo "docs_changed=true" >> $GITHUB_OUTPUT
+          fi
+
+
+  # Step 1: Copy original files to main, detect languages, and process commit message
+  copy-original:
+    needs: check-doc-changes
+    if: needs.check-doc-changes.outputs.docs_changed == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write  # Allows pushing commits to the repository
+    outputs:
+      languages: ${{ steps.detect-languages.outputs.languages }}
+      commit-message: ${{ steps.get-latest-commit.outputs.latest-commit-message }}
+      new-files: ${{ steps.detect-new-files.outputs.new-files }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get the latest commit message and sanitize it for branch name
+        id: get-latest-commit
+        run: |
+          # Get and sanitize the latest commit message
+          LATEST_COMMIT_MESSAGE=$(git log -1 --pretty=%B main | tr '\n' ' ' | tr -dc '[:alnum:]-_ ')
+
+          # Replace spaces with hyphens and truncate to a reasonable length for branch name
+          SHORT_COMMIT_MESSAGE=$(echo "$LATEST_COMMIT_MESSAGE" | sed 's/ /-/g' | sed 's/--*/-/g' | sed 's/-$//g' | cut -c1-50)
+
+          # If the sanitized message is empty or consists only of special characters, provide a default value
+          if [[ -z "$SHORT_COMMIT_MESSAGE" ]]; then
+            SHORT_COMMIT_MESSAGE="default-message"
+          fi
+
+          echo "Sanitized commit message: $SHORT_COMMIT_MESSAGE"
+          echo "latest-commit-message=$SHORT_COMMIT_MESSAGE" >> $GITHUB_OUTPUT
+
+      - name: Detect languages from i18n folder
+        id: detect-languages
+        run: |
+          # Detect the languages by listing directories under i18n/ with names that are exactly 2 or 5 characters long
+          languages=$(find i18n -mindepth 1 -maxdepth 1 -type d | xargs -n 1 basename | grep -E '^.{2}$|^.{5}$')
+
+          # Format the languages as a JSON array (single array, handle multiple lines correctly)
+          languages_json=$(echo "$languages" | tr '\n' ' ' | awk '{printf "[\"%s\"", $1; for(i=2;i<=NF;i++) printf ",\"%s\"", $i; print "]"}')
+
+          echo "Detected languages: $languages_json"
+          echo "languages=$languages_json" >> $GITHUB_OUTPUT
+
+      - name: Detect newly added files in the latest commit
+        id: detect-new-files
+        run: |
+          # Detect new files added in the latest commit and handle filenames with spaces
+          git diff --name-status HEAD~1 HEAD | awk '$1 == "A" { $1=""; print substr($0,2) }' > new_files_list.txt
+      
+          # Convert the new files list to a space-separated string and store it as output
+          if [ -s new_files_list.txt ]; then
+            new_files=$(awk '{ printf "\"%s\" ", $0 }' < new_files_list.txt)
+            echo "new-files=$new_files"
+            echo "new-files=$new_files" >> $GITHUB_OUTPUT
+          else
+            echo "No new files to process."
+            echo "new-files=" >> $GITHUB_OUTPUT  # Set new-files as empty
+            exit 0
+          fi
+        # Upload the new files list as an artifact
+      - name: Upload new files list artifact
+        if: ${{ steps.detect-new-files.outputs.new-files != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: new-files-list
+          path: new_files_list.txt
+
+      - name: Copy files to i18n folders
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+      
+          # Ensure we are up to date with the latest changes from remote
+          git fetch origin
+          git pull origin main --rebase
+      
+          # Find new files added in the last commit (use null-delimiter to handle spaces in filenames)
+          new_files=$(git diff --name-status -z origin/main~1 origin/main | grep -z '^A' | cut -zf2-)
+      
+          if [ -z "$new_files" ]; then
+            echo "No new files to copy."
+            exit 0
+          fi
+      
+          # Strip the JSON array format (remove brackets and quotes) to get the language list
+          for lang in $(echo "${{ steps.detect-languages.outputs.languages }}" | sed 's/\[//g' | sed 's/\]//g' | sed 's/"//g' | tr ',' ' '); do
+            echo "Processing language: $lang"
+      
+            # Use the new files output from the previous job
+            for file in ${{ steps.detect-new-files.outputs.new-files }}; do
+              relative_path=${file#docs/}
+              destination_dir="i18n/$lang/docusaurus-plugin-content-docs/current/$(dirname "$relative_path")"
+              
+              # Create the destination directory if it doesn't exist
+              mkdir -p "$destination_dir"
+              
+              # Copy the file to the destination directory
+              cp "$file" "$destination_dir/"
+              
+              echo "Copied $file to $destination_dir"
+            done
+          done
+      
+          # Commit the changes to the main branch
+          git add i18n/
+          git commit -m "${{ steps.get-latest-commit.outputs.latest-commit-message }} - Add original files for all locales to main branch"
+          git push origin main
+        
+# Step 2: Prepend language code and create translation branches (matrix mode)
+  translate:
+    needs: 
+      - check-doc-changes
+      - copy-original
+    if: needs.check-doc-changes.outputs.docs_changed == 'true'  &&  needs.copy-original.outputs.new-files != '' # Reference docs_changed from check-doc-changes job
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write     # Allows creating new branches and pushing commits
+      pull-requests: write # Allows creating pull requests
+
+    strategy:
+      matrix:
+        #lang: ${{ fromJson(needs.copy-original.outputs.languages) }} # Dynamically use detected languages
+        #lang: ["fr", "ro"]
+        lang: ["ro-RO"]
+
+    steps:
+      - name: Debug languages output
+        run: |
+          echo "Languages output: ${{ needs.copy-original.outputs.languages }}"
+
+      - name: Set environment variables for branch and commit message
+        run: |
+          LANG="${{ matrix.lang }}"
+          COMMIT_MESSAGE="${{ needs.copy-original.outputs.commit-message }}"
+
+          # Set BRANCH_NAME by combining LANG and COMMIT_MESSAGE
+          BRANCH_NAME="locale-${LANG}-${COMMIT_MESSAGE}"
+
+          # Write BRANCH_NAME and COMMIT_MESSAGE to GITHUB_ENV for use in subsequent steps
+          echo "BRANCH_NAME=$BRANCH_NAME" >> $GITHUB_ENV
+          echo "COMMIT_MESSAGE=$COMMIT_MESSAGE" >> $GITHUB_ENV
+          echo "Actor: ${{ github.actor }}" 
+       
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: main  # Ensure it fetches the latest main branch
+
+      - name: Download new files list artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: new-files-list
+          path: ./ # This ensures it downloads to the current directory as a file, not a directory
+
+      - name: Verify downloaded artifact
+        run: |
+          ls -la
+          if [ -d new_files_list.txt ]; then
+            echo "Error: new_files_list.txt is a directory!"
+            exit 1
+          fi
+          echo "new_files_list.txt is correctly downloaded as a file"
+          cat new_files_list.txt
+      
+      # - name: Debug i18n folder
+      #   run: ls -la i18n/${{ matrix.lang }}/docusaurus-plugin-content-docs/current
+
+      - name: Call Docker action to process translations #unauthorized if private
+        uses: docker://ghcr.io/fluentis-doc/translate-action:latest
+        with:
+          args: "new_files_list.txt /github/workspace ${{ matrix.lang }} ${{ secrets.OPENAI_API_KEY }}"
+      # "new_files_list.txt" \
+      # "./" \
+      # "${{ matrix.lang }}" \
+      # "${{ secrets.OPENAI_API_KEY }}"
+
+      - name: Create translation branch and prepend language code
+        run: |
+          LANG="${{ matrix.lang }}"
+          # Use the environment variables set in the previous step
+          echo "Using branch name: $BRANCH_NAME"
+          echo "Using commit message: $COMMIT_MESSAGE"
+
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+
+          # # Ensure we are on the latest main branch
+          # git fetch origin
+          # git checkout main
+          # git pull origin main
+
+          # Create a new branch for this language
+          git checkout -b "$BRANCH_NAME"
+
+          # Commit and push the changes to the new branch
+          git add i18n/
+          git commit -m "Automatic translation for locale-${LANG} based on ${COMMIT_MESSAGE}"
+          git push origin "$BRANCH_NAME"
+
+      - name: Debug commit message
+        run: |
+          echo "Commit message: $COMMIT_MESSAGE"
+
+      - name: Create Pull Request
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          LANG="${{ matrix.lang }}"
+          # Use the BRANCH_NAME and COMMIT_MESSAGE from GITHUB_ENV
+
+          # Write the body to a temporary file because of line ending not correctly handled
+          body="This PR contains the automatic translation for the ${{ matrix.lang }} language.\nPlease delete the  ${BRANCH_NAME} after merge."
+          temp_file=$(mktemp)
+          echo -e "$body" > "$temp_file"
+
+          # Export the content of the temporary file
+          export msg=$(cat "$temp_file")
+          echo "Commit message: $COMMIT_MESSAGE"
+
+          gh pr create \
+            --title "${COMMIT_MESSAGE} - auto translation" \
+            --body "${msg}" \
+            --head "$BRANCH_NAME" \
+            --base "main" \
+            --label "${{ matrix.lang }},auto"
+
+          # Clean up the temporary file
+          rm "$temp_file"
+
