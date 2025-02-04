@@ -1,0 +1,191 @@
+name: Review Modified Translations
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'docs/**' # Folder to watch for changes
+#   pull_request:
+#     branches:
+#       - main
+#     paths:
+#       - 'docs/**' # Folder to watch for changes
+
+jobs:
+  create-issues:
+    runs-on: ubuntu-latest
+    permissions:
+        issues: write
+        contents: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Fetch at least 2 commits to compare HEAD with HEAD^
+
+      - name: Get modified .md files from the last commit
+        id: get-files
+        run: |
+            # Check if the commit message indicates a merge pull request
+            MERGE_MESSAGE=$(git log -1 --pretty=%B)
+
+            if [[ "$MERGE_MESSAGE" == *"Merge pull request"* ]]; then
+                echo "This is a pull request merge."
+
+                # Check if the commit was a fast-forward
+                PARENT_COUNT=$(git rev-list --count --parents -n 1 HEAD | awk '{print NF-1}')
+                if [ "$PARENT_COUNT" -eq 1 ]; then
+                    echo "This was a fast-forward merge."
+
+                    # Use the regular approach since it's a fast-forward merge
+                    MODIFIED_FILES=$(git diff-tree -M --no-commit-id --name-status -r HEAD | grep -E '^M\s.*\.md$' | awk '{print $2}' | grep '^docs/' || true)
+                    # DELETED_FILES=$(git diff-tree -M --no-commit-id --name-status -r HEAD | grep -E '^D\s.*\.md$' | awk '{print $2}' | grep '^docs/' || true)
+                    # RENAMED_FILES=$(git diff-tree -M --no-commit-id --name-status -r HEAD | grep -E '^R\*\.md$' | awk '{print $3}' | grep '^docs/' || true)
+                else
+                    # Not a fast-forward, use the original merge diff logic
+                    MODIFIED_FILES=$(git diff --name-status HEAD^1 HEAD | grep -E '^M\s.*\.md$' | awk '{print $2}' | grep '^docs/' || true)
+                    # DELETED_FILES=$(git diff --name-status HEAD^1 HEAD | grep -E '^D\s.*\.md$' | awk '{print $2}' | grep '^docs/' || true)
+                    # RENAMED_FILES=$(git diff --name-status HEAD^1 HEAD | grep -E '^R.*\.md$' | awk '{print $3}' | grep '^docs/' || true)
+                fi
+            else
+                echo "This is a regular commit."
+                # Use the regular approach
+                MODIFIED_FILES=$(git diff-tree -M --no-commit-id --name-status -r HEAD | grep -E '^M\s.*\.md$' | awk '{print $2}' | grep '^docs/' || true)
+                # DELETED_FILES=$(git diff-tree -M --no-commit-id --name-status -r HEAD | grep -E '^D\s.*\.md$' | awk '{print $2}' | grep '^docs/' || true)
+                # RENAMED_FILES=$(git diff-tree -M --no-commit-id --name-status -r HEAD | grep -E '^R\*\.md$' | awk '{print $3}' | grep '^docs/' || true)
+            fi
+            
+            # Check if there are any files and set environment variables
+            if [ -z "$MODIFIED_FILES" ] && [ -z "$DELETED_FILES" ] && [ -z "$RENAMED_FILES" ]; then
+                echo "No modified, deleted, or renamed .md files found in the docs/ folder."
+                exit 0
+            fi
+            
+            # Set environment variables for modified, deleted, and renamed files
+            if [ -n "$MODIFIED_FILES" ]; then
+                MODIFIED_FILES=$(echo "$MODIFIED_FILES" | tr '\n' ' ')
+                echo "DEBUG: Writing modified files to environment: $MODIFIED_FILES"
+                echo "modified_files=$MODIFIED_FILES" >> $GITHUB_ENV
+            else
+                echo "DEBUG: No modified files detected."
+                echo "modified_files=" >> $GITHUB_ENV
+            fi
+            
+            # if [ -n "$DELETED_FILES" ]; then
+            #     DELETED_FILES=$(echo "$DELETED_FILES" | tr '\n' ' ')
+            #     echo "DEBUG: Writing deleted files to environment: $DELETED_FILES"
+            #     echo "deleted_files=$DELETED_FILES" >> $GITHUB_ENV
+            # else
+            #     echo "DEBUG: No deleted files detected."
+            #     echo "deleted_files=" >> $GITHUB_ENV
+            # fi
+
+            # if [ -n "$RENAMED_FILES" ]; then
+            #     RENAMED_FILES=$(echo "$RENAMED_FILES" | tr '\n' ' ')
+            #     echo "DEBUG: Writing renamed files to environment: $RENAMED_FILES"
+            #     echo "renamed_files=$RENAMED_FILES" >> $GITHUB_ENV
+            # else
+            #     echo "DEBUG: No renamed files detected."
+            #     echo "renamed_files=" >> $GITHUB_ENV
+            # fi
+            
+            # Debug: Verify environment variables were set
+            echo "DEBUG: Final environment variables:"
+            echo "modified_files=$MODIFIED_FILES"
+            # echo "deleted_files=$DELETED_FILES"
+            # echo "renamed_files=$RENAMED_FILES"
+
+      - name: Create issues for translation review
+        if: ${{ env.modified_files != '' || env.deleted_files != '' }}
+        env:
+            GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+            MODIFIED_FILES: ${{ env.modified_files }}
+            DELETED_FILES: ${{ env.deleted_files }}
+            LANGUAGES: "en-US ro-RO hr-HR" # List of languages
+            REPO: ${{ github.repository }}
+        run: |
+            # Define mappings of languages to team member usernames
+            declare -A team_usernames
+            team_usernames=( 
+                ["en-US"]="alba-fluentis" 
+                ["ro-RO"]="rodica1234" 
+                ["hr-HR"]="Federica-fluentis" 
+            )
+            
+            # get last commit message for use in issue title
+            COMMIT_MESSAGE_HEADER=$(git log -1 --pretty=%B | head -n 1)
+            
+            # Convert space-separated lists to newline-separated lists
+            modified_files=$(echo "$MODIFIED_FILES" | tr ' ' '\n')
+            # deleted_files=$(echo "$DELETED_FILES" | tr ' ' '\n')
+
+            # Process each language
+            for LANG in $LANGUAGES; do
+
+                # Get the team member username for the current language
+                team_member=${team_usernames[$LANG]}
+
+                #team_name="translation-team-${LANG}" # Assume your teams are named with the full locale
+                team_name="translation-team-${LANG:0:2}"
+                
+
+                # Initialize the body for modified files
+                if [ -n "$modified_files" ]; then
+                body="The following files have been modified and need to be reviewed for translation to **${LANG} language**:\n"
+                body+="\n@fluentis-doc/${team_name}\n" # Mention the team in the body
+                for file in $modified_files; do
+                    # Remove 'docs/' prefix from file paths
+                    processed_file="https://github.com/${REPO}/edit/main/i18n/${LANG}/docusaurus-plugin-content-docs/current/${file#docs/}"
+                    body+="- [$file](https://github.com/${REPO}/blob/main/${file})  \n"
+                    body+="   [${LANG:0:2} file](${processed_file})\n"
+                done
+
+                echo "DEBUG: Body content for modified files - $body"
+                echo "DEBUG: Title ${COMMIT_MESSAGE_HEADER}"
+                echo "DEBUG: Title $COMMIT_MESSAGE_HEADER"
+
+                # Write the body to a temporary file
+                temp_file=$(mktemp)
+                echo -e "$body" > "$temp_file"
+
+                # Create the GitHub issue using the temporary file for the body
+                
+                gh issue create \
+                    --title "$COMMIT_MESSAGE_HEADER" \
+                    --assignee "$team_member" \
+                    --label "modified-review-translation,${LANG}" \
+                    --body-file "$temp_file"
+
+                # Clean up the temporary file
+                rm "$temp_file"
+                fi
+
+                # # Initialize the body for deleted files
+                # if [ -n "$deleted_files" ]; then
+                # body="The following files have been deleted from main. Check if should be also deleted from **${LANG} language**:\n"
+                # body+="\n@fluentis-doc/${team_name}\n" # Mention the team in the body
+                # for file in $deleted_files; do
+                #     # Remove 'docs/' prefix from file paths
+                #     processed_file="https://github.com/${REPO}/blob/main/i18n/${LANG}/docusaurus-plugin-content-docs/current/${file#docs/}"
+                #     body+="- [$file](https://github.com/${REPO}/blob/main/${file})  \n"
+                #     body+="   [${LANG:0:2} file](${processed_file})\n"
+                # done
+
+                # echo "DEBUG: Body content for deleted files - $body"
+
+                # # Write the body to a temporary file
+                # temp_file=$(mktemp)
+                # echo -e "$body" > "$temp_file"
+
+                # # Create the GitHub issue using the temporary file for the body
+                # gh issue create \
+                #     --title "$COMMIT_MESSAGE_HEADER" \
+                #     --assignee "$team_member" \
+                #     --label "deleted-review-translation,${LANG}" \
+                #     --body-file "$temp_file"
+
+                # # Clean up the temporary file
+                # rm "$temp_file"
+                # fi
+            done
