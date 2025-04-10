@@ -222,7 +222,6 @@ const config = {
         docs: {
           sidebarPath: require.resolve('./sidebars.js'),
           // Please change this to your repo.
-         exclude: ['**/spersaiasa.md'],
           showLastUpdateTime: false,
         },
         /* blog: {
