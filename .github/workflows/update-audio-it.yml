@@ -1,40 +1,42 @@
-name: Sync checklist with "Audio IT" field
-
+name: Update Audio IT field
 on:
-  issues:
-    types: [edited]
-
-permissions:
-  issues: read
-  contents: read
-  id-token: write
+  workflow_dispatch:
+    inputs:
+      itemId:
+        description: 'Item ID'
+        required: true
+      audioITStatus:
+        description: 'Audio IT Status (To do, In progress, Done)'
+        required: true
 
 jobs:
-  update-field:
+  update-audio-it:
     runs-on: ubuntu-latest
     steps:
-      - name: Extract checklist status and update project field
-        uses: actions/github-script@v7
+      - name: Set field option ID
+        id: map
+        run: |
+          case "${{ github.event.inputs.audioITStatus }}" in
+            "To do")
+              echo "OPTION_ID=685e784f" >> $GITHUB_OUTPUT
+              ;;
+            "In progress")
+              echo "OPTION_ID=6fb89e71" >> $GITHUB_OUTPUT
+              ;;
+            "Done")
+              echo "OPTION_ID=23df36af" >> $GITHUB_OUTPUT
+              ;;
+            *)
+              echo "Invalid audioITStatus value"
+              exit 1
+              ;;
+          esac
+
+      - name: Update Audio IT field
+        uses: peter-evans/update-project-fields@v2
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            const issue = context.payload.issue;
-            const body = issue.body || "";
-
-            // Determină statusul bifat în checklist
-            let value = null;
-            if (/\[x\]\s*\(Done\)/i.test(body)) {
-              value = "Done";
-            } else if (/\[x\]\s*\(In progress\)/i.test(body)) {
-              value = "In progress";
-            } else if (/\[x\]\s*\(To do\)/i.test(body)) {
-              value = "To do";
-            } else {
-              console.log("No checklist status found.");
-              return;
-            }
-
-            // Pasul următor: caută cardul asociat acestui issue în Projects v2
-            // Aici trebuie să folosești GraphQL pentru a obține ID-ul proiectului și al câmpului „Audio IT”
-
-            // EXTRAS: Dacă vrei, pot genera și partea de query GraphQL completă pentru a face această automatizare 100% funcțională.
+          token: ${{ secrets.GITHUB_TOKEN }}
+          project-id: PVT_kwHOCmDFmc4A31rN
+          item-id: ${{ github.event.inputs.itemId }}
+          field-id: PVTSSF_lAHOCmDFmc4A31rNzgs6G5E
+          option-id: ${{ steps.map.outputs.OPTION_ID }}
