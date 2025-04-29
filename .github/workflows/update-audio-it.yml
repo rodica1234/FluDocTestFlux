@@ -1,0 +1,40 @@
+name: Sync checklist with "Audio IT" field
+
+on:
+  issues:
+    types: [edited]
+
+permissions:
+  issues: read
+  contents: read
+  id-token: write
+
+jobs:
+  update-field:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Extract checklist status and update project field
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const issue = context.payload.issue;
+            const body = issue.body || "";
+
+            // Determină statusul bifat în checklist
+            let value = null;
+            if (/\[x\]\s*\(Done\)/i.test(body)) {
+              value = "Done";
+            } else if (/\[x\]\s*\(In progress\)/i.test(body)) {
+              value = "In progress";
+            } else if (/\[x\]\s*\(To do\)/i.test(body)) {
+              value = "To do";
+            } else {
+              console.log("No checklist status found.");
+              return;
+            }
+
+            // Pasul următor: caută cardul asociat acestui issue în Projects v2
+            // Aici trebuie să folosești GraphQL pentru a obține ID-ul proiectului și al câmpului „Audio IT”
+
+            // EXTRAS: Dacă vrei, pot genera și partea de query GraphQL completă pentru a face această automatizare 100% funcțională.
