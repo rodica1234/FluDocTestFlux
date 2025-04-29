@@ -1,31 +1,105 @@
-trigger:
-  event: "Issue Updated"
-  condition:
-    field: "Audio IT"
-    value_contains: "- [x] (To do)"        # Verifică dacă "To do" a fost bifat
-    or:
-      value_contains: "- [x] (In progress)"  # Verifică dacă "In progress" a fost bifat
-    or:
-      value_contains: "- [x] (Done)"        # Verifică dacă "Done" a fost bifat
+name: Update "Audio IT" Field in ProjectsV2
 
-actions:
-  - updateField:
-      project: "test ro"
-      field: "Audio IT"
-      value: "To do"
-      condition:
-        description_contains: "- [x] (To do)"  # Dacă "To do" a fost bifat
-  
-  - updateField:
-      project: "test ro"
-      field: "Audio IT"
-      value: "In progress"
-      condition:
-        description_contains: "- [x] (In progress)"  # Dacă "In progress" a fost bifat
+on:
+  issues:
+    types: [opened, edited]  # Trigger când un issue este deschis sau editat
 
-  - updateField:
-      project: "test ro"
-      field: "Audio IT"
-      value: "Done"
-      condition:
-        description_contains: "- [x] (Done)"  # Dacă "Done" a fost bifat
+jobs:
+  update_audio_it_field:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Update "Audio IT" field based on checklist
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const octokit = github.getOctokit(process.env.GITHUB_TOKEN);
+            
+            // Obține detaliile issue-ului
+            const { data: issue } = await octokit.rest.issues.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number
+            });
+
+            // Verifică dacă există un checklist bifat pentru "Audio IT" în descriere
+            const description = issue.body;
+            let fieldValue = "";
+
+            if (description.includes("- [x] (To do)")) {
+              fieldValue = "To do";
+            } else if (description.includes("- [x] (In progress)")) {
+              fieldValue = "In progress";
+            } else if (description.includes("- [x] (Done)")) {
+              fieldValue = "Done";
+            }
+
+            if (fieldValue) {
+              // Folosim API-ul pentru ProjectsV2 pentru a actualiza câmpul "Audio IT"
+              const { data: projectsV2 } = await octokit.graphql(`
+                query {
+                  viewer {
+                    login
+                    projectsV2(first: 10) {
+                      nodes {
+                        id
+                        title
+                        fields(first: 20) {
+                          nodes {
+                            id
+                            name
+                            options {
+                              id
+                              name
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              `);
+
+              // Căutăm proiectul "test ro" din lista de proiecte
+              const project = projectsV2.nodes.find(project => project.title === "test ro");
+
+              if (!project) {
+                throw new Error('Project "test ro" not found');
+              }
+
+              // Căutăm câmpul "Audio IT" în proiectul respectiv
+              const audioITField = project.fields.nodes.find(field => field.name === "Audio IT");
+
+              if (!audioITField) {
+                throw new Error('Field "Audio IT" not found in project "test ro"');
+              }
+
+              // Căutăm opțiunea corespunzătoare din "Audio IT" și o actualizăm
+              const optionToUpdate = audioITField.options.find(option => option.name === fieldValue);
+
+              if (!optionToUpdate) {
+                throw new Error(`Option "${fieldValue}" not found in "Audio IT"`);
+              }
+
+              // Actualizăm câmpul "Audio IT" cu valoarea corespunzătoare
+              await octokit.graphql(`
+                mutation {
+                  updateProjectV2ItemFieldValue(
+                    input: {
+                      projectId: "${project.id}",
+                      fieldId: "${audioITField.id}",
+                      value: { singleSelectOptionId: "${optionToUpdate.id}" },
+                      itemId: "${issue.id}"
+                    }
+                  ) {
+                    clientMutationId
+                  }
+                }
+              `);
+
+              console.log(`Updated "Audio IT" field for issue #${issue.number} to "${fieldValue}"`);
+            }
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
