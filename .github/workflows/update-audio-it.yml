@@ -27,7 +27,7 @@ jobs:
               "Done": "23df36af"
             };
 
-            const fieldValue = fieldValueMap[${{ github.event.inputs.field-value }}];
+            const fieldValue = fieldValueMap[`${{ github.event.inputs.field-value }}`];
 
             if (!fieldValue) {
               throw new Error("Invalid value for Audio IT field.");
@@ -44,7 +44,7 @@ jobs:
             `, {
               input: {
                 projectId: "PVT_kwHOCmDFmc4A31rN",  # ID-ul proiectului
-                itemId: "${{ github.event.inputs.item-id }}",  # ID-ul itemului
+                itemId: `${{ github.event.inputs.item-id }}`,  # ID-ul itemului
                 fieldId: "PVTSSF_lAHOCmDFmc4A31rNzgs6G5E",  # ID-ul câmpului „Audio IT”
                 value: {
                   singleSelectOptionId: fieldValue  # Valoarea selectată
