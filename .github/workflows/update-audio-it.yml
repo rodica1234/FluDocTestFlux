@@ -1,42 +1,53 @@
-name: Update Audio IT field
+name: Update Audio IT Field in Project
+
 on:
   workflow_dispatch:
     inputs:
-      itemId:
-        description: 'Item ID'
+      item-id:
+        description: 'ID-ul elementului din proiect (project item ID)'
         required: true
-      audioITStatus:
-        description: 'Audio IT Status (To do, In progress, Done)'
+      field-value:
+        description: 'Valoarea câmpului Audio IT (To do, In progress, Done)'
         required: true
+        default: 'In progress'
 
 jobs:
-  update-audio-it:
+  update-field:
     runs-on: ubuntu-latest
-    steps:
-      - name: Set field option ID
-        id: map
-        run: |
-          case "${{ github.event.inputs.audioITStatus }}" in
-            "To do")
-              echo "OPTION_ID=685e784f" >> $GITHUB_OUTPUT
-              ;;
-            "In progress")
-              echo "OPTION_ID=6fb89e71" >> $GITHUB_OUTPUT
-              ;;
-            "Done")
-              echo "OPTION_ID=23df36af" >> $GITHUB_OUTPUT
-              ;;
-            *)
-              echo "Invalid audioITStatus value"
-              exit 1
-              ;;
-          esac
 
+    steps:
       - name: Update Audio IT field
-        uses: peter-evans/update-project-fields@v2
+        uses: actions/github-script@v7
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          project-id: PVT_kwHOCmDFmc4A31rN
-          item-id: ${{ github.event.inputs.itemId }}
-          field-id: PVTSSF_lAHOCmDFmc4A31rNzgs6G5E
-          option-id: ${{ steps.map.outputs.OPTION_ID }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fieldValueMap = {
+              "To do": "685e784f",
+              "In progress": "6fb89e71",
+              "Done": "23df36af"
+            };
+
+            const fieldValue = fieldValueMap[${{ github.event.inputs.field-value }}];
+
+            if (!fieldValue) {
+              throw new Error("Invalid value for Audio IT field.");
+            }
+
+            await github.graphql(`
+              mutation($input: UpdateProjectV2ItemFieldValueInput!) {
+                updateProjectV2ItemFieldValue(input: $input) {
+                  projectV2Item {
+                    id
+                  }
+                }
+              }
+            `, {
+              input: {
+                projectId: "PVT_kwHOCmDFmc4A31rN",  # ID-ul proiectului
+                itemId: "${{ github.event.inputs.item-id }}",  # ID-ul itemului
+                fieldId: "PVTSSF_lAHOCmDFmc4A31rNzgs6G5E",  # ID-ul câmpului „Audio IT”
+                value: {
+                  singleSelectOptionId: fieldValue  # Valoarea selectată
+                }
+              }
+            });
