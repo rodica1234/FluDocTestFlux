@@ -1,7 +1,7 @@
 trigger:
   event: "Issue Updated"
   condition:
-    field: "description"
+    field: "Audio IT"
     value_contains: "- [x] (To do)"        # Verifică dacă "To do" a fost bifat
     or:
       value_contains: "- [x] (In progress)"  # Verifică dacă "In progress" a fost bifat
