@@ -114,4 +114,4 @@ jobs:
               }
             `);
 
-            console.log(\`Audio IT setat la: \${selectedOption}.\`);
+            console.log("Audio IT setat la: " + selectedOption);
