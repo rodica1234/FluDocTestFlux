@@ -1,0 +1,100 @@
+name: Sync Audio IT field from checklist
+
+on:
+  issues:
+    types: [edited]
+
+jobs:
+  sync-audio-it:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: read
+      repository-projects: write
+    steps:
+      - name: Sync Audio IT field
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const issue = context.payload.issue;
+            const body = issue.body;
+            const issueId = issue.node_id;
+
+            // Înlocuiește aceste ID-uri cu cele reale (vezi mai jos cum le obții)
+            const projectId = "PVT_kwHOCmDFmc4A31rN";
+            const fieldId = "PVTSSF_lAHOCmDFmc4A31rNzgs6G5E";
+            const optionIds = {
+              "To do": "685e784f",
+              "In progress": "6fb89e71",
+              "Done": "23df36af"
+            };
+
+            // Caută care dintre cele 3 opțiuni este bifată
+            const audioITSectionRegex = /\*\*Audio IT:\*\*([\s\S]*?)\n(?=\n|$)/;
+            const sectionMatch = body.match(audioITSectionRegex);
+
+            let selectedOption = null;
+            if (sectionMatch) {
+              const section = sectionMatch[1];
+              if (section.includes("- [x] (To do)")) selectedOption = "To do";
+              else if (section.includes("- [x] (In progress)")) selectedOption = "In progress";
+              else if (section.includes("- [x] (Done)")) selectedOption = "Done";
+            }
+
+            if (!selectedOption) {
+              console.log("Nicio opțiune Audio IT bifată.");
+              return;
+            }
+
+            // Caută itemul din proiect asociat acestui issue
+            const itemsResponse = await github.graphql(`
+              query {
+                node(id: "${projectId}") {
+                  ... on ProjectV2 {
+                    items(first: 100) {
+                      nodes {
+                        id
+                        content {
+                          ... on Issue {
+                            id
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            `);
+
+            const item = itemsResponse.node.items.nodes.find(
+              i => i.content && i.content.id === issueId
+            );
+
+            if (!item) {
+              console.log("Nu am găsit itemul proiectului asociat cu acest issue.");
+              return;
+            }
+
+            const itemId = item.id;
+            const selectedOptionId = optionIds[selectedOption];
+
+            // Actualizează câmpul `Audio IT` în proiect
+            await github.graphql(`
+              mutation {
+                updateProjectV2ItemFieldValue(input: {
+                  projectId: "${projectId}",
+                  itemId: "${itemId}",
+                  fieldId: "${fieldId}",
+                  value: {
+                    singleSelectOptionId: "${selectedOptionId}"
+                  }
+                }) {
+                  projectV2Item {
+                    id
+                  }
+                }
+              }
+            `);
+
+            console.log(\`Audio IT setat la "\${selectedOption}".\`);
