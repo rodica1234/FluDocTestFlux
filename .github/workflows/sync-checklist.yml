@@ -8,7 +8,7 @@ permissions:
   contents: read
   issues: read
   pull-requests: read
-  projectV2: write  # Important pentru Projects v2
+  repository-projects: write
 
 jobs:
   sync-audio-it:
