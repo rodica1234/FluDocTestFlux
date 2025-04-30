@@ -21,7 +21,6 @@ jobs:
             const body = issue.body;
             const issueId = issue.node_id;
 
-            // Înlocuiește aceste ID-uri cu cele reale (vezi mai jos cum le obții)
             const projectId = "PVT_kwHOCmDFmc4A31rN";
             const fieldId = "PVTSSF_lAHOCmDFmc4A31rNzgs6G5E";
             const optionIds = {
@@ -30,16 +29,20 @@ jobs:
               "Done": "23df36af"
             };
 
-            // Caută care dintre cele 3 opțiuni este bifată
             const audioITSectionRegex = /\*\*Audio IT:\*\*([\s\S]*?)(?=\n\s*\n|$)/;
             const sectionMatch = body.match(audioITSectionRegex);
 
             let selectedOption = null;
             if (sectionMatch) {
               const section = sectionMatch[1];
-              if (section.includes("- [x] (To do)")) selectedOption = "To do";
-              else if (section.includes("- [x] (In progress)")) selectedOption = "In progress";
-              else if (section.includes("- [x] (Done)")) selectedOption = "Done";
+              const lines = section.trim().split('\n').map(l => l.trim());
+              for (const line of lines) {
+                if (line.startsWith("- [x]")) {
+                  if (line.includes("(To do)")) selectedOption = "To do";
+                  else if (line.includes("(In progress)")) selectedOption = "In progress";
+                  else if (line.includes("(Done)")) selectedOption = "Done";
+                }
+              }
             }
 
             if (!selectedOption) {
@@ -47,7 +50,7 @@ jobs:
               return;
             }
 
-            // Caută itemul din proiect asociat acestui issue
+            // Caută itemul din proiect
             const itemsResponse = await github.graphql(`
               query {
                 node(id: "${projectId}") {
@@ -67,19 +70,33 @@ jobs:
               }
             `);
 
-            const item = itemsResponse.node.items.nodes.find(
+            let item = itemsResponse.node.items.nodes.find(
               i => i.content && i.content.id === issueId
             );
 
+            let itemId;
+
             if (!item) {
-              console.log("Nu am găsit itemul proiectului asociat cu acest issue.");
-              return;
+              console.log("Itemul nu există în proiect, îl adăugăm...");
+              const addResponse = await github.graphql(`
+                mutation {
+                  addProjectV2ItemById(input: {
+                    projectId: "${projectId}",
+                    contentId: "${issueId}"
+                  }) {
+                    item {
+                      id
+                    }
+                  }
+                }
+              `);
+              itemId = addResponse.addProjectV2ItemById.item.id;
+            } else {
+              itemId = item.id;
             }
 
-            const itemId = item.id;
             const selectedOptionId = optionIds[selectedOption];
 
-            // Actualizează câmpul `Audio IT` în proiect
             await github.graphql(`
               mutation {
                 updateProjectV2ItemFieldValue(input: {
@@ -97,4 +114,4 @@ jobs:
               }
             `);
 
-            console.log(\`Audio IT setat la "\${selectedOption}".\`);
+            console.log(\`Audio IT setat la: \${selectedOption}.\`);
