@@ -4,25 +4,28 @@ on:
   issues:
     types: [edited]
 
+permissions:
+  contents: read
+  issues: read
+  pull-requests: read
+  projectV2: write  # Important pentru Projects v2
+
 jobs:
   sync-audio-it:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      issues: read
-      repository-projects: write
     steps:
       - name: Sync Audio IT field
         uses: actions/github-script@v6
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          github-token: ${{ secrets.GH_PROJECTS_TOKEN }}  # Personal access token
           script: |
             const issue = context.payload.issue;
             const body = issue.body;
             const issueId = issue.node_id;
 
-            const projectId = "PVT_kwHOCmDFmc4A31rN";
-            const fieldId = "PVTSSF_lAHOCmDFmc4A31rNzgs6G5E";
+            // Înlocuiește cu ID-urile reale ale proiectului, câmpului și opțiunilor
+            const projectId = "PVT_kwHOCmDFmc4A31rN"; // ID-ul Project V2
+            const fieldId = "PVTSSF_lAHOCmDFmc4A31rNzgs6G5E"; // ID-ul câmpului "Audio IT"
             const optionIds = {
               "To do": "685e784f",
               "In progress": "6fb89e71",
@@ -35,14 +38,9 @@ jobs:
             let selectedOption = null;
             if (sectionMatch) {
               const section = sectionMatch[1];
-              const lines = section.trim().split('\n').map(l => l.trim());
-              for (const line of lines) {
-                if (line.startsWith("- [x]")) {
-                  if (line.includes("(To do)")) selectedOption = "To do";
-                  else if (line.includes("(In progress)")) selectedOption = "In progress";
-                  else if (line.includes("(Done)")) selectedOption = "Done";
-                }
-              }
+              if (section.includes("- [x] (To do)")) selectedOption = "To do";
+              else if (section.includes("- [x] (In progress)")) selectedOption = "In progress";
+              else if (section.includes("- [x] (Done)")) selectedOption = "Done";
             }
 
             if (!selectedOption) {
@@ -50,7 +48,6 @@ jobs:
               return;
             }
 
-            // Caută itemul din proiect
             const itemsResponse = await github.graphql(`
               query {
                 node(id: "${projectId}") {
@@ -70,31 +67,16 @@ jobs:
               }
             `);
 
-            let item = itemsResponse.node.items.nodes.find(
+            const item = itemsResponse.node.items.nodes.find(
               i => i.content && i.content.id === issueId
             );
 
-            let itemId;
-
             if (!item) {
-              console.log("Itemul nu există în proiect, îl adăugăm...");
-              const addResponse = await github.graphql(`
-                mutation {
-                  addProjectV2ItemById(input: {
-                    projectId: "${projectId}",
-                    contentId: "${issueId}"
-                  }) {
-                    item {
-                      id
-                    }
-                  }
-                }
-              `);
-              itemId = addResponse.addProjectV2ItemById.item.id;
-            } else {
-              itemId = item.id;
+              console.log("Nu am găsit itemul proiectului asociat cu acest issue.");
+              return;
             }
 
+            const itemId = item.id;
             const selectedOptionId = optionIds[selectedOption];
 
             await github.graphql(`
